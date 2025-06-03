@@ -102,4 +102,11 @@ public class DBHelper extends SQLiteOpenHelper {
         db.close();
         return recordList;
     }
+    public boolean deleteRecord(int recordId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        int rowsAffected = db.delete(tableName, columnId + "=?",
+                new String[]{String.valueOf(recordId)});
+        db.close();
+        return rowsAffected > 0;
+    }
 }

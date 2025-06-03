@@ -16,6 +16,8 @@ public class RecordAdapter extends ArrayAdapter<Record> {
     private static class ViewHolder {
         TextView tvAmount, tvType, tvDate, tvDescription;
     }
+    private OnRecordClickListener onRecordClickListener;
+    private OnRecordLongClickListener onRecordLongClickListener;
 
     public RecordAdapter(Context context, List<Record> records) {
         super(context, 0, new ArrayList<>(records));
@@ -55,11 +57,47 @@ public class RecordAdapter extends ArrayAdapter<Record> {
         holder.tvType.setText(record.getType());
         holder.tvDate.setText(record.getDate());
         holder.tvDescription.setText(record.getDescription());
+        // 点击和长按事件
+        final int pos = position;
+        convertView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (onRecordClickListener != null) {
+                    onRecordClickListener.onRecordClick(pos, record);
+                }
+            }
+        });
+        convertView.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                if (onRecordLongClickListener != null) {
+                    onRecordLongClickListener.onRecordLongClick(pos, record);
+                    return true; // 消耗长按事件，避免同时触发点击
+                }
+                return false;
+            }
+        });
+
         return convertView;
     }
+
+
     public void updateData(List<Record> newData) {
         clear();
         addAll(newData);
         notifyDataSetChanged();
+    }
+    public interface OnRecordClickListener {
+        void onRecordClick(int position, Record record);
+    }
+    public interface OnRecordLongClickListener {
+        void onRecordLongClick(int position, Record record);
+    }
+    public void setOnRecordClickListener(OnRecordClickListener listener) {
+        this.onRecordClickListener = listener;
+    }
+
+    public void setOnRecordLongClickListener(OnRecordLongClickListener listener) {
+        this.onRecordLongClickListener = listener;
     }
 }
