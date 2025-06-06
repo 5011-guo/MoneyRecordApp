@@ -6,29 +6,59 @@
     android:background="@drawable/bg_splash_vector"
     android:orientation="vertical"
     android:padding="16dp"
-    android:gravity="center"
     tools:context=".MainActivity">
 
     <TextView
-        android:id="@+id/tvTotal"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="总金额: 0.00"
-        android:textSize="24sp"
+        android:text="今日份记账"
+        android:textSize="28sp"
         android:textStyle="bold"
-        android:layout_marginBottom="32dp"/>
+        android:layout_marginBottom="32dp"
+        android:textColor="@android:color/black"
+        android:gravity="center"
+        android:layout_gravity="top"/>
 
-    <Button
-        android:id="@+id/btnAdd"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="添加记录"
-        android:layout_marginBottom="16dp"/>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center">
 
-    <Button
-        android:id="@+id/btnView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="查看记录列表"/>
+        <TextView
+            android:id="@+id/tvTotal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="总金额: 0.00"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="32dp"/>
 
+        <Button
+            android:id="@+id/btnAdd"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="添加记录"
+            android:textSize="20sp"
+            android:layout_marginBottom="16dp"
+            android:minHeight="60dp"/>
+
+        <Button
+            android:id="@+id/btnView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="查看记录列表"
+            android:layout_marginBottom="16dp"
+            android:textSize="20sp"
+            android:minHeight="60dp"/>
+
+        <Button
+            android:id="@+id/btntj"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="统计"
+            android:textSize="20sp"
+            android:minHeight="60dp"/>
+    </LinearLayout>
 </LinearLayout>

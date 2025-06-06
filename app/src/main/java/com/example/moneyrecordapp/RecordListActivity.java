@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,9 +22,14 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class RecordListActivity extends AppCompatActivity {
     private ListView lvRecords;
@@ -45,6 +51,7 @@ public class RecordListActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+
         lvRecords = findViewById(R.id.lvRecords);
         tvFilterResult = findViewById(R.id.tvFilterResult);
         btnFilter = findViewById(R.id.btnFilter);
@@ -52,7 +59,7 @@ public class RecordListActivity extends AppCompatActivity {
         dpStart = findViewById(R.id.dpStart);
         dpEnd = findViewById(R.id.dpEnd);
         dbHelper = new DBHelper(this);
-        // 适配器
+
         recordList = new ArrayList<>();
         adapter = new RecordAdapter(this, recordList);
         lvRecords.setAdapter(adapter);
@@ -68,13 +75,15 @@ public class RecordListActivity extends AppCompatActivity {
                 adapter.updateData(recordList);
             }
         });
+
         adapter.setOnRecordLongClickListener(new RecordAdapter.OnRecordLongClickListener() {
             @Override
             public void onRecordLongClick(int position, Record record) {
                 showDeleteDialog(position, record);
             }
         });
-        Calendar calendar = Calendar.getInstance();      // 设置日期为当月
+
+        Calendar calendar = Calendar.getInstance();
         dpEnd.init(
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH),
@@ -92,7 +101,14 @@ public class RecordListActivity extends AppCompatActivity {
 
         btnFilter.setOnClickListener(v -> loadRecordsByDate());
         btnReset.setOnClickListener(v -> resetFilters());
+
+        // 来自统计按钮的跳转
+        boolean showStats = getIntent().getBooleanExtra("tongji", false);
+        if (showStats) {
+            new Handler().postDelayed(this::showStatisticsDialog, 300);
+        }
     }
+
     private void loadRecordsByDate() {
         String startDate = getDateFromPicker(dpStart);
         String endDate = getDateFromPicker(dpEnd);
@@ -109,7 +125,6 @@ public class RecordListActivity extends AppCompatActivity {
         tvFilterResult.setText("筛选结果 (" + startDate + " 至 " + endDate + ")");
     }
 
-    // 删除确认对话框
     private void showDeleteDialog(final int position, final Record record) {
         new AlertDialog.Builder(this)
                 .setTitle("确认删除")
@@ -117,7 +132,6 @@ public class RecordListActivity extends AppCompatActivity {
                 .setPositiveButton("确定", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        // 从数据库删除记录
                         boolean result = dbHelper.deleteRecord(record.getId());
                         if (result) {
                             recordList.remove(position);
@@ -131,9 +145,82 @@ public class RecordListActivity extends AppCompatActivity {
                 .setNegativeButton("取消", null)
                 .show();
     }
-    // 动态计算ListView高度的方法，解决scroll和listview冲突的方法摘自csdn
+
+    private void showStatisticsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("选择统计方式");
+
+        String[] options = {"按月统计", "按周统计"};
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                showMonthlyStats();
+            } else {
+                showWeeklyStats();
+            }
+        });
+        builder.show();
+    }
+
+    private void showMonthlyStats() {
+        List<Record> allRecords = dbHelper.getAllRecords();
+        Map<String, Double> monthlyStats = new HashMap<>();
+
+        for (Record record : allRecords) {
+            String month = record.getDate().substring(0, 7);
+            double amount = record.getType().equals("收入") ? record.getAmount() : -record.getAmount();
+            monthlyStats.put(month, monthlyStats.getOrDefault(month, 0.0) + amount);
+        }
+
+        showStatsResult("月度统计", monthlyStats);
+    }
+
+    private void showWeeklyStats() {
+        List<Record> allRecords = dbHelper.getAllRecords();
+        Map<String, Double> weeklyStats = new HashMap<>();
+
+        for (Record record : allRecords) {
+            String week = getWeekOfMonth(record.getDate());
+            double amount = record.getType().equals("收入") ? record.getAmount() : -record.getAmount();
+            weeklyStats.put(week, weeklyStats.getOrDefault(week, 0.0) + amount);
+        }
+
+        showStatsResult("周统计", weeklyStats);
+    }
+
+    private String getWeekOfMonth(String date) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(sdf.parse(date));
+
+            int month = cal.get(Calendar.MONTH) + 1; // 月份从0开始，所以+1
+            int week = cal.get(Calendar.WEEK_OF_MONTH);
+            return month + "月第" + week + "周";
+        } catch (Exception e) {
+            return "错误";
+        }
+    }
+    private void showStatsResult(String title, Map<String, Double> stats) {
+        StringBuilder result = new StringBuilder(title + ":\n\n");
+
+        List<String> sortedKeys = new ArrayList<>(stats.keySet());
+        Collections.sort(sortedKeys, Collections.reverseOrder());
+
+        for (String key : sortedKeys) {
+            double amount = stats.get(key);
+            result.append(key).append(": ").append(String.format("%.2f", amount))
+                    .append(amount >= 0 ? " (收入)" : " (支出)").append("\n");
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(result.toString())
+                .setPositiveButton("确定", null)
+                .show();
+    }
+
     public static void setListViewHeightBasedOnItems(ListView listView) {
-        ListAdapter listAdapter = listView.getAdapter();
+        ListAdapter listAdapter = listView.getAdapter();//解决scroll和list view的冲突
         if (listAdapter == null) return;
 
         int totalHeight = 0;
@@ -148,6 +235,7 @@ public class RecordListActivity extends AppCompatActivity {
         listView.setLayoutParams(params);
         listView.requestLayout();
     }
+
     private void resetFilters() {
         Calendar calendar = Calendar.getInstance();
         dpEnd.updateDate(
@@ -163,6 +251,7 @@ public class RecordListActivity extends AppCompatActivity {
         );
         loadRecordsByDate();
     }
+
     private String getDateFromPicker(DatePicker dp) {
         return String.format("%d-%02d-%02d",
                 dp.getYear(),
@@ -170,6 +259,7 @@ public class RecordListActivity extends AppCompatActivity {
                 dp.getDayOfMonth()
         );
     }
+
     private void updateStats(List<Record> records) {
         double totalIncome = 0;
         double totalExpense = 0;
@@ -189,6 +279,4 @@ public class RecordListActivity extends AppCompatActivity {
         tvExpense.setText("支出\n¥" + String.format("%.2f", totalExpense));
         tvBalance.setText("结余\n¥" + String.format("%.2f", totalIncome - totalExpense));
     }
-
-
 }

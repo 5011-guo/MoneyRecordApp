@@ -1,6 +1,8 @@
 package com.example.moneyrecordapp;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
@@ -11,9 +13,10 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     private TextView tvTotal;
-    private Button btnAdd, btnView;
+    private Button btnAdd, btnView,btntj;
     private DBHelper dbHelper;
 
+    @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -23,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
         btnAdd = findViewById(R.id.btnAdd);
         btnView = findViewById(R.id.btnView);
         dbHelper = new DBHelper(this);
+        btntj= findViewById(R.id.btntj);
         updateTotalAmount();
 
         btnAdd.setOnClickListener(new View.OnClickListener() {
@@ -40,7 +44,17 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
+
+        btntj.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, RecordListActivity.class);
+                intent.putExtra("tongji", true); // 添加标志位
+                startActivity(intent);
+            }
+        });
     }
+
 
     @Override
     protected void onResume() {
