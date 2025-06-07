@@ -11,13 +11,20 @@ import java.util.List;
 public class DBHelper extends SQLiteOpenHelper {
 
     private static final String databaseName = "moneyrecord.db";
-    private static final int databaseVersion = 1;
+    private static final int databaseVersion = 2;
     public static final String tableName = "records";
     public static final String columnId = "_id";
     public static final String columnAmount = "amount";
     public static final String columnType = "type";
     public static final String columnDescription = "description";
     public static final String columnDate = "date";
+
+    // 预算功能
+    public static final String TABLE_BUDGET = "budgets";
+    public static final String COLUMN_BUDGET_ID = "id";
+    public static final String COLUMN_BUDGET_MONTH = "month"; // YYYY-MM
+    public static final String COLUMN_TOTAL_BUDGET = "total_budget";
+    public static final String COLUMN_REMAINING_BUDGET = "remaining_budget";
 
     private static final String createTable = "CREATE TABLE " + tableName + " (" +
             columnId + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -33,12 +40,90 @@ public class DBHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(createTable);
+        String createBudgetTable = "CREATE TABLE " + TABLE_BUDGET + " (" +
+                COLUMN_BUDGET_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_BUDGET_MONTH + " TEXT UNIQUE, " +  // 月份唯一
+                COLUMN_TOTAL_BUDGET + " REAL, " +
+                COLUMN_REMAINING_BUDGET + " REAL" + ")";
+        db.execSQL(createBudgetTable);
+    }
+
+    public long setMonthlyBudget(String month, double totalBudget) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        long id = -1; // 先查询是否已存在该月的预算
+        Cursor cursor = db.query(TABLE_BUDGET,
+                new String[]{COLUMN_BUDGET_ID},
+                COLUMN_BUDGET_MONTH + "=?",
+                new String[]{month}, null, null, null);
+
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_BUDGET_MONTH, month);
+        values.put(COLUMN_TOTAL_BUDGET, totalBudget);
+        values.put(COLUMN_REMAINING_BUDGET, totalBudget);
+        if (cursor.moveToFirst()) {
+            //  如果已存在，直接更新
+            id = db.update(TABLE_BUDGET, values,
+                    COLUMN_BUDGET_MONTH + "=?",
+                    new String[]{month});
+        } else {
+            // 如果不存在，执行插入
+            id = db.insert(TABLE_BUDGET, null, values);
+        }
+        cursor.close();
+        db.close();
+        return id;
+    }
+
+    public void updateRemainingBudget(String month, double amount) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.execSQL("UPDATE " + TABLE_BUDGET +
+                        " SET " + COLUMN_REMAINING_BUDGET + " = " + COLUMN_REMAINING_BUDGET + " - ? " +
+                        " WHERE " + COLUMN_BUDGET_MONTH + " = ?",
+                new Object[]{amount, month});
+        db.close();
+    }
+
+    public double getRemainingBudget(String month) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_BUDGET,
+                new String[]{COLUMN_REMAINING_BUDGET},
+                COLUMN_BUDGET_MONTH + "=?",
+                new String[]{month}, null, null, null);
+
+        double remaining = -1; // -1表示没有设置预算
+        if (cursor.moveToFirst()) {
+            remaining = cursor.getDouble(0);
+        }
+        cursor.close();
+        db.close();
+        return remaining;
+    }
+
+    public double getTotalBudget(String month) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_BUDGET,
+                new String[]{COLUMN_TOTAL_BUDGET},
+                COLUMN_BUDGET_MONTH + "=?",
+                new String[]{month}, null, null, null);
+
+        double total = -1; // -1表示没有设置预算
+        if (cursor.moveToFirst()) {
+            total = cursor.getDouble(0);
+        }
+        cursor.close();
+        db.close();
+        return total;
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + tableName);
-        onCreate(db);
+        if (oldVersion < 2) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_BUDGET + " (" +
+                    COLUMN_BUDGET_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COLUMN_BUDGET_MONTH + " TEXT UNIQUE, " +
+                    COLUMN_TOTAL_BUDGET + " REAL, " +
+                    COLUMN_REMAINING_BUDGET + " REAL)");
+        }
     }
 
     public long addRecord(Record record) {
@@ -49,6 +134,13 @@ public class DBHelper extends SQLiteOpenHelper {
         values.put(columnDescription, record.getDescription());
         values.put(columnDate, record.getDate());
         long id = db.insert(tableName, null, values);
+
+        // 如果是支出，更新剩余预算
+        if (record.getType().equals("支出")) {
+            String month = record.getDate().substring(0, 7); // 从日期获取YYYY-MM
+            updateRemainingBudget(month, record.getAmount());
+        }
+
         db.close();
         return id;
     }
@@ -102,11 +194,40 @@ public class DBHelper extends SQLiteOpenHelper {
         db.close();
         return recordList;
     }
+
     public boolean deleteRecord(int recordId) {
         SQLiteDatabase db = this.getWritableDatabase();
-        int rowsAffected = db.delete(tableName, columnId + "=?",
-                new String[]{String.valueOf(recordId)});
+
+        // 先获取记录详情
+        Cursor cursor = db.query(tableName,
+                new String[]{columnType, columnAmount, columnDate},
+                columnId + "=?",
+                new String[]{String.valueOf(recordId)}, null, null, null);
+
+        boolean result = false;
+
+        if (cursor.moveToFirst()) {
+            String type = cursor.getString(0);
+            double amount = cursor.getDouble(1);
+            String date = cursor.getString(2);
+
+            // 删除记录
+            int rowsAffected = db.delete(tableName, columnId + "=?",
+                    new String[]{String.valueOf(recordId)});
+
+            // 如果是支出，恢复预算
+            if (rowsAffected > 0 && type.equals("支出")) {
+                String month = date.substring(0, 7); // 从日期获取YYYY-MM
+                db.execSQL("UPDATE " + TABLE_BUDGET +
+                                " SET " + COLUMN_REMAINING_BUDGET + " = " + COLUMN_REMAINING_BUDGET + " + ? " +
+                                " WHERE " + COLUMN_BUDGET_MONTH + " = ?",
+                        new Object[]{amount, month});
+            }
+            result = rowsAffected > 0;
+        }
+
+        cursor.close();
         db.close();
-        return rowsAffected > 0;
+        return result;
     }
 }

@@ -1,6 +1,10 @@
 package com.example.moneyrecordapp;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
@@ -26,6 +30,11 @@ public class AddRecordActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_record);
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return insets;
+        });
 
         etAmount = findViewById(R.id.etAmount);
         etDescription = findViewById(R.id.etDescription);
@@ -67,6 +76,16 @@ public class AddRecordActivity extends AppCompatActivity {
             finish();
         } else {
             Toast.makeText(this, "记录保存失败", Toast.LENGTH_SHORT).show();
+        }
+        if (record.getType().equals("支出")) {
+            String month = record.getDate().substring(0, 7);//截取年月
+            double remaining = dbHelper.getRemainingBudget(month);
+
+            if (remaining < 0) {
+                Toast.makeText(this, "⚠️ 本月预算已超支！", Toast.LENGTH_LONG).show();
+            } else if (remaining < record.getAmount()) {
+                Toast.makeText(this, "本次支出将导致预算超支！", Toast.LENGTH_LONG).show();
+            }
         }
     }
 }
