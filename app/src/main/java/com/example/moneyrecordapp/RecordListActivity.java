@@ -253,8 +253,7 @@ public class RecordListActivity extends AppCompatActivity {
     }
 
     private String getDateFromPicker(DatePicker dp) {
-        return String.format("%d-%02d-%02d",
-                dp.getYear(),
+        return String.format("%02d-%02d",
                 dp.getMonth() + 1,
                 dp.getDayOfMonth()
         );

@@ -72,7 +72,7 @@ public class RecordAdapter extends ArrayAdapter<Record> {
             public boolean onLongClick(View v) {
                 if (onRecordLongClickListener != null) {
                     onRecordLongClickListener.onRecordLongClick(pos, record);
-                    return true; // 消耗长按事件，避免同时触发点击
+                    return true;
                 }
                 return false;
             }

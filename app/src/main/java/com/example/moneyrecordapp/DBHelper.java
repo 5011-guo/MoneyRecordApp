@@ -55,18 +55,15 @@ public class DBHelper extends SQLiteOpenHelper {
                 new String[]{COLUMN_BUDGET_ID},
                 COLUMN_BUDGET_MONTH + "=?",
                 new String[]{month}, null, null, null);
-
         ContentValues values = new ContentValues();
         values.put(COLUMN_BUDGET_MONTH, month);
         values.put(COLUMN_TOTAL_BUDGET, totalBudget);
         values.put(COLUMN_REMAINING_BUDGET, totalBudget);
         if (cursor.moveToFirst()) {
-            //  如果已存在，直接更新
             id = db.update(TABLE_BUDGET, values,
                     COLUMN_BUDGET_MONTH + "=?",
                     new String[]{month});
         } else {
-            // 如果不存在，执行插入
             id = db.insert(TABLE_BUDGET, null, values);
         }
         cursor.close();
@@ -77,7 +74,7 @@ public class DBHelper extends SQLiteOpenHelper {
     public void updateRemainingBudget(String month, double amount) {
         SQLiteDatabase db = this.getWritableDatabase();
         db.execSQL("UPDATE " + TABLE_BUDGET +
-                        " SET " + COLUMN_REMAINING_BUDGET + " = " + COLUMN_REMAINING_BUDGET + " - ? " +
+                        " SET " + COLUMN_REMAINING_BUDGET + " = " + COLUMN_REMAINING_BUDGET + " + ? " +
                         " WHERE " + COLUMN_BUDGET_MONTH + " = ?",
                 new Object[]{amount, month});
         db.close();
@@ -89,8 +86,7 @@ public class DBHelper extends SQLiteOpenHelper {
                 new String[]{COLUMN_REMAINING_BUDGET},
                 COLUMN_BUDGET_MONTH + "=?",
                 new String[]{month}, null, null, null);
-
-        double remaining = -1; // -1表示没有设置预算
+        double remaining = -1; // 没有设置预算
         if (cursor.moveToFirst()) {
             remaining = cursor.getDouble(0);
         }
@@ -134,13 +130,14 @@ public class DBHelper extends SQLiteOpenHelper {
         values.put(columnDescription, record.getDescription());
         values.put(columnDate, record.getDate());
         long id = db.insert(tableName, null, values);
-
-        // 如果是支出，更新剩余预算
+        String month = record.getDate().substring(0, 7);
         if (record.getType().equals("支出")) {
-            String month = record.getDate().substring(0, 7); // 从日期获取YYYY-MM
+            // 支出时减少剩余预算
+            updateRemainingBudget(month, -record.getAmount());
+        } else {
+            // 收入时增加剩余预算
             updateRemainingBudget(month, record.getAmount());
         }
-
         db.close();
         return id;
     }
@@ -148,10 +145,8 @@ public class DBHelper extends SQLiteOpenHelper {
     public List<Record> getAllRecords() {
         List<Record> recordList = new ArrayList<>();
         String selectQuery = "SELECT * FROM " + tableName + " ORDER BY " + columnDate + " DESC";
-
         SQLiteDatabase db = this.getWritableDatabase();
         Cursor cursor = db.rawQuery(selectQuery, null);
-
         if (cursor.moveToFirst()) {
             do {
                 Record record = new Record();
@@ -163,7 +158,6 @@ public class DBHelper extends SQLiteOpenHelper {
                 recordList.add(record);
             } while (cursor.moveToNext());
         }
-
         cursor.close();
         db.close();
         return recordList;
@@ -172,12 +166,10 @@ public class DBHelper extends SQLiteOpenHelper {
     public List<Record> getRecordsByDate(String startDate, String endDate) {
         List<Record> recordList = new ArrayList<>();
         String selectQuery = "SELECT * FROM " + tableName +
-                " WHERE " + columnDate + " BETWEEN ? AND ?" +
+                " WHERE substr(date, 6) BETWEEN ? AND ?" +  //取月和日
                 " ORDER BY " + columnDate + " DESC";
-
         SQLiteDatabase db = this.getWritableDatabase();
         Cursor cursor = db.rawQuery(selectQuery, new String[]{startDate, endDate});
-
         if (cursor.moveToFirst()) {
             do {
                 Record record = new Record();
@@ -189,7 +181,6 @@ public class DBHelper extends SQLiteOpenHelper {
                 recordList.add(record);
             } while (cursor.moveToNext());
         }
-
         cursor.close();
         db.close();
         return recordList;
@@ -197,35 +188,29 @@ public class DBHelper extends SQLiteOpenHelper {
 
     public boolean deleteRecord(int recordId) {
         SQLiteDatabase db = this.getWritableDatabase();
-
-        // 先获取记录详情
+        boolean result = false;
         Cursor cursor = db.query(tableName,
                 new String[]{columnType, columnAmount, columnDate},
                 columnId + "=?",
                 new String[]{String.valueOf(recordId)}, null, null, null);
-
-        boolean result = false;
-
         if (cursor.moveToFirst()) {
             String type = cursor.getString(0);
             double amount = cursor.getDouble(1);
             String date = cursor.getString(2);
-
-            // 删除记录
             int rowsAffected = db.delete(tableName, columnId + "=?",
                     new String[]{String.valueOf(recordId)});
-
-            // 如果是支出，恢复预算
-            if (rowsAffected > 0 && type.equals("支出")) {
-                String month = date.substring(0, 7); // 从日期获取YYYY-MM
-                db.execSQL("UPDATE " + TABLE_BUDGET +
-                                " SET " + COLUMN_REMAINING_BUDGET + " = " + COLUMN_REMAINING_BUDGET + " + ? " +
-                                " WHERE " + COLUMN_BUDGET_MONTH + " = ?",
-                        new Object[]{amount, month});
+            if (rowsAffected > 0) {
+                String month = date.substring(0, 7);
+                if (type.equals("支出")) {
+                    // 恢复支出：增加剩余预算
+                    updateRemainingBudget(month, amount);
+                } else {
+                    // 删除收入：减少剩余预算
+                    updateRemainingBudget(month, -amount);
+                }
+                result = true;
             }
-            result = rowsAffected > 0;
         }
-
         cursor.close();
         db.close();
         return result;

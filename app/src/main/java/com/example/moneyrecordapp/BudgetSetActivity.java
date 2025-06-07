@@ -12,7 +12,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -36,9 +35,7 @@ public class BudgetSetActivity extends AppCompatActivity {
         inputBudgetAmount = findViewById(R.id.inputBudgetAmount);
         showBudgetStatus = findViewById(R.id.showBudgetStatus);
         dbHelper = new DBHelper(this);
-
         showCurrentBudgetStatus();
-
         findViewById(R.id.btnSaveBudget).setOnClickListener(v -> saveBudget());
     }
     private void saveBudget() {
@@ -61,7 +58,6 @@ public class BudgetSetActivity extends AppCompatActivity {
         String currentMonth = new SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(new Date());
         double total = dbHelper.getTotalBudget(currentMonth);
         double remaining = dbHelper.getRemainingBudget(currentMonth);
-
         if (total < 0) {
             showBudgetStatus.setText("本月未设置预算");
             showBudgetStatus.setTextColor(Color.BLACK);
@@ -69,11 +65,10 @@ public class BudgetSetActivity extends AppCompatActivity {
             String status = String.format(Locale.getDefault(),
                     "本月预算: ¥%.2f\n剩余可用: ¥%.2f", total, remaining);
             showBudgetStatus.setText(status);
-
             // 根据剩余比例设置颜色
             double ratio = remaining / total;
             if (ratio < 0.2) {
-                showBudgetStatus.setTextColor(Color.RED); // 少于20%显示红色
+                showBudgetStatus.setTextColor(Color.RED);
             } else if (ratio < 0.5) {
                 showBudgetStatus.setTextColor(Color.parseColor("#FFA500")); // 橙色
             } else {
